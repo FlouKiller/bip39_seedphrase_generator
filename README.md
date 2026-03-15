@@ -1,99 +1,177 @@
-# BIP39 Seed Phrase Generator (Python)
+# BIP39 Seed Phrase Generator
 
-Petit outil CLI pour:
-- generer une phrase mnemotechnique BIP39 (12 ou 24 mots),
-- verifier une phrase BIP39 (checksum + mots valides),
-- diagnostiquer rapidement la source aleatoire du systeme.
+Outil local en Python avec deux modes:
+
+- une version CLI simple pour generer/verifier une phrase BIP39,
+- une version web Flask avec interface moderne et outils Bitcoin derives.
 
 ## Fonctionnalites
 
-- Chargement et validation stricte de la wordlist BIP39:
-  - 2048 mots obligatoires,
-  - aucun doublon,
-  - format attendu (mots en minuscules a-z),
-  - empreinte SHA-256 comparee a la liste officielle BIP39 anglaise.
-- Generation BIP39:
-  - 12 mots (128 bits d'entropie + checksum 4 bits),
-  - 24 mots (256 bits d'entropie + checksum 8 bits).
-- Verification BIP39:
-  - accepte uniquement 12, 15, 18, 21, 24 mots,
-  - verifie presence des mots dans la liste,
-  - verifie le checksum BIP39.
-- Diagnostic entropie (informatif):
-  - couverture des octets observes,
-  - entropie estimee (Shannon),
-  - score chi-square.
+### CLI
+
+- generation de seed phrase BIP39 en 12 ou 24 mots,
+- verification de phrase BIP39 (mots + checksum),
+- diagnostic simple de l'entropie systeme.
+
+### Web Flask
+
+- generation BIP39 avec interface graphique,
+- verification de phrase BIP39,
+- diagnostic d'entropie,
+- derivation Bitcoin a partir d'une phrase + passphrase optionnelle,
+- affichage de:
+  - seed hex,
+  - BIP32 root key,
+  - comptes BIP44 / BIP49 / BIP84,
+  - adresses, XPUB, XPRV, WIF,
+- derivation avancee avec:
+  - choix du schema `BIP32`, `BIP44`, `BIP49`, `BIP84`,
+  - compte (`account`),
+  - chaine (`chain`: externe/interne),
+  - index,
+- section repliable d'adresses de depot,
+- QR code local pour adresses, cles et champs derives,
+- copie rapide des valeurs sensibles.
+
+## Validation de la wordlist
+
+La wordlist anglaise BIP39 est verifiee strictement:
+
+- 2048 mots exacts,
+- aucun doublon,
+- format attendu en minuscules ASCII,
+- hash SHA-256 compare a la liste officielle BIP39 anglaise.
 
 ## Prerequis
 
 - Python 3.8+
-- Fichiers dans le meme dossier:
-  - app.py
-  - bip39_words.txt
+- fichiers du projet dans le meme dossier:
+  - `app.py`
+  - `web_app.py`
+  - `bip39_words.txt`
+  - `templates/index.html`
+  - `requirements.txt`
 
-## Installation / Lancement
+## Installation
 
-1. Ouvrir un terminal dans le dossier du projet.
-2. Lancer:
+Dans le dossier du projet:
+
+```bash
+pip install -r requirements.txt
+```
+
+Sous Windows, vous pouvez aussi utiliser:
+
+```powershell
+py -m pip install -r requirements.txt
+```
+
+## Lancement
+
+### Mode CLI
 
 ```bash
 python app.py
 ```
 
-Sous Windows, selon votre installation:
+### Mode Web Flask
 
-```powershell
-py app.py
+```bash
+python web_app.py
 ```
 
-## Utilisation
+Puis ouvrir:
 
-Au lancement, un menu principal apparait:
+```text
+http://127.0.0.1:5000
+```
 
-1. Generer une nouvelle phrase
-2. Verifier une phrase
-3. Diagnostiquer l'entropie du PC
-4. Quitter
+## Utilisation de la version web
 
-### 1) Generation
+### 1. Generer
 
-- Choisir 12 ou 24 mots.
-- Le script utilise `os.urandom` pour generer l'entropie.
-- La phrase mnemotechnique est affichee dans le terminal.
+- choisir 12 ou 24 mots,
+- generer une phrase BIP39,
+- copier la phrase si besoin.
 
-### 2) Verification
+### 2. Verifier
 
-- Coller votre phrase separee par des espaces.
-- Le script verifie:
-  - le nombre de mots,
-  - la presence de chaque mot dans la wordlist,
-  - le checksum BIP39.
+- coller une phrase,
+- verifier le nombre de mots,
+- verifier les mots de la wordlist,
+- verifier le checksum.
 
-### 3) Diagnostic entropie
+### 3. Bitcoin
 
-- Lance un test simple sur un echantillon de 1 Mo.
-- Donne des indicateurs utiles, mais ce n'est pas un audit cryptographique complet.
+- saisir une phrase BIP39,
+- ajouter une passphrase optionnelle,
+- deriver:
+  - la seed hex,
+  - la BIP32 root key,
+  - les donnees BIP44 / BIP49 / BIP84.
+
+Le mode avance permet aussi de:
+
+- changer le schema de derivation,
+- modifier `account`, `chain` et `index`,
+- afficher les account keys,
+- lister les adresses de depot derivees,
+- afficher des QR codes pour les champs importants.
+
+### 4. Entropie
+
+- lance un test simple sur 1 Mo de donnees `os.urandom`,
+- affiche entropie estimee, chi-square et couverture des octets.
+
+## Endpoints Flask utiles
+
+- `POST /api/generate`
+- `POST /api/verify`
+- `GET /api/entropy`
+- `POST /api/bitcoin/derive`
+- `POST /api/bitcoin/derive-path`
+- `POST /api/bitcoin/addresses`
+- `POST /api/qrcode`
+
+Exemple `curl` pour tester la generation:
+
+```bash
+curl -s -X POST http://127.0.0.1:5000/api/generate -H "Content-Type: application/json" -d "{\"word_count\": 12}"
+```
 
 ## Structure du projet
 
-- app.py: logique principale (menus, generation, verification, diagnostic)
-- bip39_words.txt: wordlist BIP39 anglaise officielle (2048 mots)
+- `app.py` : version CLI
+- `web_app.py` : backend Flask + APIs
+- `templates/index.html` : interface web
+- `bip39_words.txt` : wordlist BIP39 anglaise
+- `requirements.txt` : dependances Python
 
-## Securite et bonnes pratiques
+## Dependances
 
-- Ne partagez jamais votre seed phrase.
-- Evitez de generer une seed sur une machine non fiable.
-- Idealement, utilisez une machine hors ligne (air-gapped) pour la generation.
-- Sauvegardez la seed hors ligne (papier/metal), pas dans le cloud.
+- `flask`
+- `bip-utils`
+- `qrcode[pil]`
+
+## Securite
+
+- utilisez cet outil uniquement en local,
+- ne partagez jamais votre seed phrase,
+- ne stockez pas seed / xprv / WIF dans le cloud,
+- evitez les captures d'ecran si vous manipulez des cles privees,
+- idealement, travaillez hors ligne sur une machine de confiance.
 
 ## Limitations
 
-- Outil CLI educatif/pratique, pas un wallet complet.
-- Le test d'entropie est informatif seulement.
-- Ce projet n'implemente pas de passphrase BIP39 (25e mot) pour le moment.
+- ce projet est un outil educatif/local, pas un wallet complet,
+- aucune diffusion sur le reseau Bitcoin n'est faite,
+- aucun solde on-chain n'est charge,
+- le test d'entropie est informatif seulement.
 
-## Idee d'ameliorations
+## Pistes d'amelioration
 
-- Ajouter support de la passphrase BIP39.
-- Export optionnel vers QR (hors seed en clair).
-- Ajouter tests unitaires automatiques.
+- ajout du testnet,
+- pagination des adresses derivees,
+- affichage optionnel des balances via une API externe,
+- export QR plus avance pour les donnees publiques,
+- tests automatises.

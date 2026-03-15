@@ -4,6 +4,17 @@ import os
 import re
 
 from flask import Flask, render_template, jsonify, request
+from bip_utils import (
+    Bip32Secp256k1,
+    Bip39SeedGenerator,
+    Bip44,
+    Bip44Changes,
+    Bip44Coins,
+    Bip49,
+    Bip49Coins,
+    Bip84,
+    Bip84Coins,
+)
 
 BIP39_WORD_COUNT = 2048
 BIP39_ENGLISH_SHA256 = "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d618ff757fae"
@@ -49,6 +60,38 @@ def get_wordlist():
     return _wordlist, _word_index
 
 
+def parse_and_validate_mnemonic(raw_phrase):
+    if not isinstance(raw_phrase, str):
+        return None, "Entrée invalide."
+
+    phrase = raw_phrase.strip().lower().split()
+    length = len(phrase)
+
+    if length == 0:
+        return None, "Aucune phrase saisie."
+    if length not in VALID_MNEMONIC_LENGTHS:
+        valid_str = ", ".join(str(n) for n in VALID_MNEMONIC_LENGTHS)
+        return None, f"{length} mot(s) détecté(s). Longueurs BIP39 valides : {valid_str}."
+
+    _, word_index = get_wordlist()
+    invalid_words = [w for w in phrase if w not in word_index]
+    if invalid_words:
+        return None, f"Le mot « {invalid_words[0]} » n'est pas dans la liste BIP39."
+
+    checksum_size = length // 3
+    entropy_size = length * 11 - checksum_size
+    bits = "".join(bin(word_index[w])[2:].zfill(11) for w in phrase)
+    entropy_bits = bits[:entropy_size]
+    provided_cksum = bits[entropy_size:]
+    ent_bytes = int(entropy_bits, 2).to_bytes(entropy_size // 8, "big")
+    calc_cksum = bin(int.from_bytes(hashlib.sha256(ent_bytes).digest(), "big"))[2:].zfill(256)[:checksum_size]
+
+    if provided_cksum != calc_cksum:
+        return None, "Phrase invalide — le checksum ne correspond pas."
+
+    return " ".join(phrase), None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -78,41 +121,71 @@ def api_generate():
 @app.route("/api/verify", methods=["POST"])
 def api_verify():
     data = request.get_json(silent=True) or {}
-    raw = data.get("phrase", "")
-    if not isinstance(raw, str):
-        return jsonify({"valid": False, "message": "Entrée invalide."}), 400
+    mnemonic, err = parse_and_validate_mnemonic(data.get("phrase", ""))
+    if err:
+        return jsonify({"valid": False, "message": err})
+    return jsonify({"valid": True, "message": f"Phrase de {len(mnemonic.split())} mots valide — checksum correct."})
 
-    phrase = raw.strip().lower().split()
-    length = len(phrase)
 
-    if length == 0:
-        return jsonify({"valid": False, "message": "Aucune phrase saisie."})
-    if length not in VALID_MNEMONIC_LENGTHS:
-        valid_str = ", ".join(str(n) for n in VALID_MNEMONIC_LENGTHS)
-        return jsonify({
-            "valid": False,
-            "message": f"{length} mot(s) détecté(s). Longueurs BIP39 valides : {valid_str}."
-        })
+@app.route("/api/bitcoin/derive", methods=["POST"])
+def api_bitcoin_derive():
+    data = request.get_json(silent=True) or {}
+    mnemonic, err = parse_and_validate_mnemonic(data.get("phrase", ""))
+    if err:
+        return jsonify({"error": err}), 400
 
-    wordlist, word_index = get_wordlist()
-    invalid_words = [w for w in phrase if w not in word_index]
-    if invalid_words:
-        return jsonify({
-            "valid": False,
-            "message": f"Le mot « {invalid_words[0]} » n'est pas dans la liste BIP39."
-        })
+    passphrase = data.get("passphrase", "")
+    if not isinstance(passphrase, str):
+        return jsonify({"error": "La passphrase doit être une chaîne."}), 400
 
-    checksum_size = length // 3
-    entropy_size = length * 11 - checksum_size
-    bits = "".join(bin(word_index[w])[2:].zfill(11) for w in phrase)
-    entropy_bits = bits[:entropy_size]
-    provided_cksum = bits[entropy_size:]
-    ent_bytes = int(entropy_bits, 2).to_bytes(entropy_size // 8, "big")
-    calc_cksum = bin(int.from_bytes(hashlib.sha256(ent_bytes).digest(), "big"))[2:].zfill(256)[:checksum_size]
+    try:
+        seed_bytes = Bip39SeedGenerator(mnemonic).Generate(passphrase)
+        seed_hex = seed_bytes.hex()
+        master_xprv = Bip32Secp256k1.FromSeed(seed_bytes).PrivateKey().ToExtended()
 
-    if provided_cksum == calc_cksum:
-        return jsonify({"valid": True, "message": f"Phrase de {length} mots valide — checksum correct."})
-    return jsonify({"valid": False, "message": "Phrase invalide — le checksum ne correspond pas."})
+        ctx44 = Bip44.FromSeed(seed_bytes, Bip44Coins.BITCOIN)
+        acc44 = ctx44.Purpose().Coin().Account(0)
+        ext44 = acc44.Change(Bip44Changes.CHAIN_EXT)
+        addr44_ctx = ext44.AddressIndex(0)
+
+        ctx49 = Bip49.FromSeed(seed_bytes, Bip49Coins.BITCOIN)
+        acc49 = ctx49.Purpose().Coin().Account(0)
+        ext49 = acc49.Change(Bip44Changes.CHAIN_EXT)
+        addr49_ctx = ext49.AddressIndex(0)
+
+        ctx84 = Bip84.FromSeed(seed_bytes, Bip84Coins.BITCOIN)
+        acc84 = ctx84.Purpose().Coin().Account(0)
+        ext84 = acc84.Change(Bip44Changes.CHAIN_EXT)
+        addr84_ctx = ext84.AddressIndex(0)
+    except Exception as e:
+        return jsonify({"error": f"Échec de dérivation Bitcoin : {str(e)}"}), 500
+
+    return jsonify({
+        "mnemonic": mnemonic,
+        "seed_hex": seed_hex,
+        "bip32_root_key": master_xprv,
+        "bip44": {
+            "path": "m/44'/0'/0'/0/0",
+            "account_xprv": acc44.PrivateKey().ToExtended(),
+            "account_xpub": acc44.PublicKey().ToExtended(),
+            "address": addr44_ctx.PublicKey().ToAddress(),
+            "wif": addr44_ctx.PrivateKey().ToWif(),
+        },
+        "bip49": {
+            "path": "m/49'/0'/0'/0/0",
+            "account_xprv": acc49.PrivateKey().ToExtended(),
+            "account_xpub": acc49.PublicKey().ToExtended(),
+            "address": addr49_ctx.PublicKey().ToAddress(),
+            "wif": addr49_ctx.PrivateKey().ToWif(),
+        },
+        "bip84": {
+            "path": "m/84'/0'/0'/0/0",
+            "account_xprv": acc84.PrivateKey().ToExtended(),
+            "account_xpub": acc84.PublicKey().ToExtended(),
+            "address": addr84_ctx.PublicKey().ToAddress(),
+            "wif": addr84_ctx.PrivateKey().ToWif(),
+        },
+    })
 
 
 @app.route("/api/entropy", methods=["GET"])

@@ -355,6 +355,101 @@
     .verify-result.ok  { background: var(--ok-glow);  border: 1px solid rgba(16,185,129,.3); color: var(--ok); }
     .verify-result.bad { background: var(--err-glow); border: 1px solid rgba(239,68,68,.3);  color: var(--err); }
 
+    /* ── Bitcoin derive ────────────────────────────────────────────────────── */
+    .in-row {
+      display: flex;
+      gap: .6rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+    .text-input {
+      flex: 1;
+      width: 100%;
+      padding: .72rem .9rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--rs);
+      color: var(--txt);
+      font-family: var(--mono);
+      font-size: .9rem;
+      transition: border-color var(--t), box-shadow var(--t);
+    }
+    .text-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .text-input::placeholder { color: var(--txt3); }
+    .btn-inline {
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      color: var(--txt2);
+      border-radius: 6px;
+      padding: .62rem .9rem;
+      font-size: .82rem;
+      cursor: pointer;
+      transition: all var(--t);
+      white-space: nowrap;
+    }
+    .btn-inline:hover { border-color: var(--accent-l); color: var(--accent-l); }
+    .kv-block {
+      margin-top: .8rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--rs);
+      padding: .75rem .85rem;
+    }
+    .kv-label {
+      font-size: .73rem;
+      color: var(--txt3);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .35rem;
+    }
+    .kv-value {
+      font-family: var(--mono);
+      font-size: .9rem;
+      color: var(--txt);
+      line-height: 1.7;
+      word-break: break-all;
+      transition: filter var(--t);
+    }
+    .kv-value.hidden { filter: blur(5px); user-select: none; }
+    .btc-grid {
+      margin-top: .8rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .6rem;
+    }
+    .btc-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--rs);
+      padding: .8rem;
+    }
+    .btc-title {
+      font-size: .78rem;
+      color: var(--gold);
+      font-weight: 700;
+      letter-spacing: .04em;
+      margin-bottom: .45rem;
+    }
+    .btc-mini {
+      font-size: .72rem;
+      color: var(--txt3);
+      margin-top: .4rem;
+      margin-bottom: .15rem;
+    }
+    .btc-val {
+      font-family: var(--mono);
+      color: var(--txt2);
+      font-size: .82rem;
+      word-break: break-all;
+      line-height: 1.55;
+      transition: filter var(--t);
+    }
+    .btc-val.hidden { filter: blur(4px); user-select: none; }
+
     /* ── Entropy ────────────────────────────────────────────────────────────── */
     .ent-info {
       background: var(--bg2);
@@ -421,6 +516,8 @@
       .card { padding: 1.25rem; }
       .word-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
       .ent-stats { grid-template-columns: 1fr; }
+      .btc-grid { grid-template-columns: 1fr; }
+      .in-row { flex-direction: column; align-items: stretch; }
       .tab-btn .tab-text { display: none; }
       .wc-toggle { flex-direction: column; }
     }
@@ -450,6 +547,9 @@
     </button>
     <button class="tab-btn" onclick="switchTab('verify', this)" role="tab">
       <span class="ti">✅</span><span class="tab-text">Vérifier</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('bitcoin', this)" role="tab">
+      <span class="ti">₿</span><span class="tab-text">Bitcoin</span>
     </button>
     <button class="tab-btn" onclick="switchTab('entropy', this)" role="tab">
       <span class="ti">📊</span><span class="tab-text">Entropie</span>
@@ -515,6 +615,39 @@
     </div>
   </div>
 
+  <!-- ── Tab : Bitcoin ─────────────────────────────────────────────────────── -->
+  <div id="tab-bitcoin" class="tab-panel" role="tabpanel">
+    <div class="card">
+      <div class="card-title">Bitcoin Tools (BIP39/BIP32/BIP44/49/84)</div>
+      <p class="card-desc">
+        À partir d'une phrase mnémonique valide (+ passphrase optionnelle), dérive la seed hex,
+        la clé racine BIP32 et les premières adresses Bitcoin pour BIP44, BIP49 et BIP84.
+      </p>
+
+      <textarea
+        class="phrase-input"
+        id="btcPhraseInput"
+        placeholder="Entrez votre phrase BIP39 ici…"
+        rows="3"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+      ></textarea>
+
+      <div class="in-row">
+        <input class="text-input" id="btcPassphrase" type="password" placeholder="Passphrase (optionnelle)" />
+        <button class="btn-inline" onclick="useGeneratedPhrase()">Utiliser la phrase générée</button>
+      </div>
+
+      <button class="btn-primary" id="btcBtn" onclick="deriveBitcoin()">
+        <span>₿</span> Dériver les clés et adresses
+      </button>
+
+      <div id="btcResult" style="display:none;"></div>
+    </div>
+  </div>
+
   <!-- ── Tab : Entropie ────────────────────────────────────────────────────── -->
   <div id="tab-entropy" class="tab-panel" role="tabpanel">
     <div class="card">
@@ -552,6 +685,7 @@
   let selectedWC = 12;
   let hidden = false;
   let lastPhrase = '';
+  let btcHidden = true;
 
   /* ─ Tab switching ─────────────────────────────────────── */
   function switchTab(name, btn) {
@@ -717,6 +851,122 @@
     }
   }
 
+  /* ─ Bitcoin derive ───────────────────────────────────── */
+  function useGeneratedPhrase() {
+    if (!lastPhrase) return;
+    const el = document.getElementById('btcPhraseInput');
+    el.value = lastPhrase;
+  }
+
+  async function deriveBitcoin() {
+    const phrase = document.getElementById('btcPhraseInput').value.trim();
+    const passphrase = document.getElementById('btcPassphrase').value;
+    const btn = document.getElementById('btcBtn');
+    const res = document.getElementById('btcResult');
+    btcHidden = true;
+
+    if (!phrase) {
+      res.innerHTML = `<div class="verify-result bad">❌ Veuillez saisir une phrase.</div>`;
+      res.style.display = 'block';
+      return;
+    }
+
+    setBusy(btn, '<span class="spin"></span> Dérivation en cours…');
+    res.style.display = 'none';
+
+    try {
+      const r = await fetch('/api/bitcoin/derive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phrase, passphrase })
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) {
+        res.innerHTML = errBox(d.error || 'Erreur de dérivation Bitcoin');
+        res.style.display = 'block';
+        return;
+      }
+
+      res.innerHTML = `
+        <div class="result-wrap">
+          <div class="result-header">
+            <span class="section-label" style="margin:0">Résultats dérivation Bitcoin</span>
+            <div class="result-actions">
+              <button class="btn-sm" id="btcHideBtn" onclick="toggleBtcHide()">👁 Afficher</button>
+              <button class="btn-sm" id="btcCopyAddrBtn" onclick="copyText('${escJs(d.bip84.address)}', 'btcCopyAddrBtn')">📋 Copier BTC (bech32)</button>
+            </div>
+          </div>
+
+          <div class="kv-block">
+            <div class="kv-label">Seed (hex)</div>
+            <div class="kv-value hidden" data-btc-sensitive>${esc(d.seed_hex)}</div>
+          </div>
+
+          <div class="kv-block">
+            <div class="kv-label">BIP32 Root Key (xprv)</div>
+            <div class="kv-value hidden" data-btc-sensitive>${esc(d.bip32_root_key)}</div>
+          </div>
+
+          <div class="btc-grid">
+            ${renderBtcCard('BIP44 (Legacy)', d.bip44)}
+            ${renderBtcCard('BIP49 (Nested SegWit)', d.bip49)}
+            ${renderBtcCard('BIP84 (Native SegWit)', d.bip84)}
+          </div>
+
+          <div class="sec-note">
+            ⚠️ <span>Les clés privées et seed sont ultra sensibles. Ne capturez pas d'écran et évitez tout partage en ligne.</span>
+          </div>
+        </div>`;
+
+      res.style.display = 'block';
+    } catch (e) {
+      res.innerHTML = errBox('Erreur réseau : ' + e.message);
+      res.style.display = 'block';
+    } finally {
+      setIdle(btn, '<span>₿</span> Dériver les clés et adresses');
+    }
+  }
+
+  function renderBtcCard(title, d) {
+    return `
+      <div class="btc-card">
+        <div class="btc-title">${esc(title)}</div>
+        <div class="btc-mini">Path</div>
+        <div class="btc-val">${esc(d.path)}</div>
+        <div class="btc-mini">Address</div>
+        <div class="btc-val">${esc(d.address)}</div>
+        <div class="btc-mini">Account XPUB</div>
+        <div class="btc-val">${esc(d.account_xpub)}</div>
+        <div class="btc-mini">Account XPRV</div>
+        <div class="btc-val hidden" data-btc-sensitive>${esc(d.account_xprv)}</div>
+        <div class="btc-mini">WIF (index 0)</div>
+        <div class="btc-val hidden" data-btc-sensitive>${esc(d.wif)}</div>
+      </div>`;
+  }
+
+  function toggleBtcHide() {
+    btcHidden = !btcHidden;
+    document.querySelectorAll('[data-btc-sensitive]').forEach(el => {
+      el.classList.toggle('hidden', btcHidden);
+    });
+    const btn = document.getElementById('btcHideBtn');
+    if (btn) btn.textContent = btcHidden ? '👁 Afficher' : '👁 Masquer';
+  }
+
+  function copyText(text, btnId) {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      const old = btn.textContent;
+      btn.textContent = '✓ Copié !';
+      btn.classList.add('ok');
+      setTimeout(() => {
+        btn.textContent = old;
+        btn.classList.remove('ok');
+      }, 1800);
+    });
+  }
+
   /* ─ Hide / show words ─────────────────────────────────── */
   function toggleHide() {
     hidden = !hidden;
@@ -771,6 +1021,13 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+  function escJs(s) {
+    return String(s)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '');
   }
 </script>
 

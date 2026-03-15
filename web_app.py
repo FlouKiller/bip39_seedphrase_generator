@@ -1,4 +1,6 @@
 import hashlib
+import io
+import base64
 import math
 import os
 import re
@@ -15,6 +17,7 @@ from bip_utils import (
     Bip84,
     Bip84Coins,
 )
+import qrcode
 
 BIP39_WORD_COUNT = 2048
 BIP39_ENGLISH_SHA256 = "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d618ff757fae"
@@ -90,6 +93,16 @@ def parse_and_validate_mnemonic(raw_phrase):
         return None, "Phrase invalide — le checksum ne correspond pas."
 
     return " ".join(phrase), None
+
+
+def parse_non_negative_int(value, field_name):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None, f"{field_name} doit être un entier >= 0."
+    if parsed < 0:
+        return None, f"{field_name} doit être un entier >= 0."
+    return parsed, None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -188,6 +201,107 @@ def api_bitcoin_derive():
     })
 
 
+@app.route("/api/bitcoin/derive-path", methods=["POST"])
+def api_bitcoin_derive_path():
+    data = request.get_json(silent=True) or {}
+    mnemonic, err = parse_and_validate_mnemonic(data.get("phrase", ""))
+    if err:
+        return jsonify({"error": err}), 400
+
+    passphrase = data.get("passphrase", "")
+    if not isinstance(passphrase, str):
+        return jsonify({"error": "La passphrase doit être une chaîne."}), 400
+
+    scheme = str(data.get("scheme", "bip84")).lower()
+    if scheme not in ["bip32", "bip44", "bip49", "bip84"]:
+        return jsonify({"error": "scheme invalide (bip32, bip44, bip49, bip84)."}), 400
+
+    account, err = parse_non_negative_int(data.get("account", 0), "account")
+    if err:
+        return jsonify({"error": err}), 400
+    chain, err = parse_non_negative_int(data.get("chain", 0), "chain")
+    if err:
+        return jsonify({"error": err}), 400
+    index, err = parse_non_negative_int(data.get("index", 0), "index")
+    if err:
+        return jsonify({"error": err}), 400
+
+    if chain not in [0, 1]:
+        return jsonify({"error": "chain doit être 0 (external) ou 1 (internal)."}), 400
+
+    try:
+        seed_bytes = Bip39SeedGenerator(mnemonic).Generate(passphrase)
+
+        if scheme == "bip32":
+            master = Bip32Secp256k1.FromSeed(seed_bytes)
+            account_node = master.DerivePath(f"{account}'")
+            child_node = account_node.DerivePath(f"{chain}/{index}")
+            return jsonify({
+                "scheme": "bip32",
+                "account": account,
+                "chain": chain,
+                "index": index,
+                "derivation_path": f"m/{account}'/{chain}",
+                "full_path": f"m/{account}'/{chain}/{index}",
+                "account_xprv": account_node.PrivateKey().ToExtended(),
+                "account_xpub": account_node.PublicKey().ToExtended(),
+                "child_private_key_hex": child_node.PrivateKey().Raw().ToHex(),
+                "child_public_key_hex": child_node.PublicKey().RawCompressed().ToHex(),
+            })
+
+        if scheme == "bip44":
+            ctx = Bip44.FromSeed(seed_bytes, Bip44Coins.BITCOIN)
+            acc = ctx.Purpose().Coin().Account(account)
+            child_ctx = acc.Change(Bip44Changes.CHAIN_EXT if chain == 0 else Bip44Changes.CHAIN_INT).AddressIndex(index)
+            return jsonify({
+                "scheme": "bip44",
+                "account": account,
+                "chain": chain,
+                "index": index,
+                "derivation_path": f"m/44'/0'/{account}'/{chain}",
+                "full_path": f"m/44'/0'/{account}'/{chain}/{index}",
+                "account_xprv": acc.PrivateKey().ToExtended(),
+                "account_xpub": acc.PublicKey().ToExtended(),
+                "address": child_ctx.PublicKey().ToAddress(),
+                "wif": child_ctx.PrivateKey().ToWif(),
+            })
+
+        if scheme == "bip49":
+            ctx = Bip49.FromSeed(seed_bytes, Bip49Coins.BITCOIN)
+            acc = ctx.Purpose().Coin().Account(account)
+            child_ctx = acc.Change(Bip44Changes.CHAIN_EXT if chain == 0 else Bip44Changes.CHAIN_INT).AddressIndex(index)
+            return jsonify({
+                "scheme": "bip49",
+                "account": account,
+                "chain": chain,
+                "index": index,
+                "derivation_path": f"m/49'/0'/{account}'/{chain}",
+                "full_path": f"m/49'/0'/{account}'/{chain}/{index}",
+                "account_xprv": acc.PrivateKey().ToExtended(),
+                "account_xpub": acc.PublicKey().ToExtended(),
+                "address": child_ctx.PublicKey().ToAddress(),
+                "wif": child_ctx.PrivateKey().ToWif(),
+            })
+
+        ctx = Bip84.FromSeed(seed_bytes, Bip84Coins.BITCOIN)
+        acc = ctx.Purpose().Coin().Account(account)
+        child_ctx = acc.Change(Bip44Changes.CHAIN_EXT if chain == 0 else Bip44Changes.CHAIN_INT).AddressIndex(index)
+        return jsonify({
+            "scheme": "bip84",
+            "account": account,
+            "chain": chain,
+            "index": index,
+            "derivation_path": f"m/84'/0'/{account}'/{chain}",
+            "full_path": f"m/84'/0'/{account}'/{chain}/{index}",
+            "account_xprv": acc.PrivateKey().ToExtended(),
+            "account_xpub": acc.PublicKey().ToExtended(),
+            "address": child_ctx.PublicKey().ToAddress(),
+            "wif": child_ctx.PrivateKey().ToWif(),
+        })
+    except Exception as e:
+        return jsonify({"error": f"Échec de dérivation avancée : {str(e)}"}), 500
+
+
 @app.route("/api/entropy", methods=["GET"])
 def api_entropy():
     sample_size = 1024 * 1024
@@ -213,6 +327,34 @@ def api_entropy():
         "chi2": round(chi2, 2),
         "status": "good" if good else "warning",
     })
+
+
+@app.route("/api/qrcode", methods=["POST"])
+def api_qrcode():
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "")
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"error": "Le champ text est requis."}), 400
+
+    if len(text) > 4096:
+        return jsonify({"error": "Texte trop long pour QR (max 4096 caractères)."}), 400
+
+    try:
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=2,
+        )
+        qr.add_data(text)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        png_b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return jsonify({"png_base64": png_b64})
+    except Exception as e:
+        return jsonify({"error": f"Échec génération QR: {str(e)}"}), 500
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

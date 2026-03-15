@@ -399,12 +399,35 @@
       border-radius: var(--rs);
       padding: .75rem .85rem;
     }
+    .kv-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      margin-bottom: .35rem;
+    }
+    .mini-actions {
+      display: flex;
+      gap: .35rem;
+      flex-wrap: wrap;
+    }
+    .mini-btn {
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--txt2);
+      border-radius: 5px;
+      padding: .2rem .45rem;
+      font-size: .72rem;
+      cursor: pointer;
+      transition: all var(--t);
+    }
+    .mini-btn:hover { border-color: var(--accent-l); color: var(--accent-l); }
     .kv-label {
       font-size: .73rem;
       color: var(--txt3);
       text-transform: uppercase;
       letter-spacing: .08em;
-      margin-bottom: .35rem;
+      margin-bottom: 0;
     }
     .kv-value {
       font-family: var(--mono);
@@ -414,7 +437,6 @@
       word-break: break-all;
       transition: filter var(--t);
     }
-    .kv-value.hidden { filter: blur(5px); user-select: none; }
     .btc-grid {
       margin-top: .8rem;
       display: grid;
@@ -448,7 +470,132 @@
       line-height: 1.55;
       transition: filter var(--t);
     }
-    .btc-val.hidden { filter: blur(4px); user-select: none; }
+
+    .qr-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 8, 18, .84);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .qr-modal.show { display: flex; }
+    .qr-card {
+      width: min(94vw, 420px);
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 1rem;
+      box-shadow: var(--shadow);
+    }
+    .qr-title {
+      font-size: .9rem;
+      color: var(--txt2);
+      margin-bottom: .7rem;
+    }
+    .qr-image-wrap {
+      background: #fff;
+      border-radius: 8px;
+      padding: .7rem;
+      display: flex;
+      justify-content: center;
+      margin-bottom: .65rem;
+    }
+    .qr-image-wrap img {
+      width: min(300px, 72vw);
+      height: auto;
+    }
+    .qr-text {
+      max-height: 120px;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: .78rem;
+      color: var(--txt2);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .5rem;
+      word-break: break-all;
+    }
+    .qr-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: .4rem;
+      margin-top: .7rem;
+    }
+    .adv-box {
+      margin-top: 1rem;
+      background: linear-gradient(180deg, rgba(37,99,235,.06), rgba(37,99,235,.01));
+      border: 1px solid var(--border2);
+      border-radius: var(--rs);
+      padding: .85rem;
+    }
+    .adv-tabs {
+      display: inline-flex;
+      gap: .25rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: .2rem;
+      margin-bottom: .8rem;
+    }
+    .adv-tab {
+      border: none;
+      background: transparent;
+      color: var(--txt2);
+      padding: .3rem .6rem;
+      border-radius: 6px;
+      font-size: .8rem;
+      cursor: pointer;
+    }
+    .adv-tab.active {
+      background: var(--accent-glow);
+      color: var(--accent-l);
+      border: 1px solid rgba(37,99,235,.45);
+    }
+    .adv-controls {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr .8fr .8fr auto;
+      gap: .5rem;
+      align-items: end;
+      margin-bottom: .8rem;
+    }
+    .adv-field label {
+      display: block;
+      color: var(--txt3);
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .25rem;
+    }
+    .adv-field input {
+      width: 100%;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .5rem .6rem;
+      color: var(--txt);
+      font-family: var(--mono);
+      font-size: .84rem;
+    }
+    .adv-path {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .58rem .6rem;
+      color: var(--gold-l);
+      font-family: var(--mono);
+      font-size: .85rem;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .adv-key-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .6rem;
+    }
 
     /* ── Entropy ────────────────────────────────────────────────────────────── */
     .ent-info {
@@ -518,6 +665,7 @@
       .ent-stats { grid-template-columns: 1fr; }
       .btc-grid { grid-template-columns: 1fr; }
       .in-row { flex-direction: column; align-items: stretch; }
+      .adv-controls { grid-template-columns: 1fr; }
       .tab-btn .tab-text { display: none; }
       .wc-toggle { flex-direction: column; }
     }
@@ -645,6 +793,38 @@
       </button>
 
       <div id="btcResult" style="display:none;"></div>
+
+      <div id="btcAdvanced" class="adv-box" style="display:none;">
+        <div class="section-label">Dérivation Avancée</div>
+        <div class="adv-tabs">
+          <button class="adv-tab active" data-scheme="bip32" onclick="setAdvScheme('bip32', this)">BIP32</button>
+          <button class="adv-tab" data-scheme="bip44" onclick="setAdvScheme('bip44', this)">BIP44</button>
+          <button class="adv-tab" data-scheme="bip49" onclick="setAdvScheme('bip49', this)">BIP49</button>
+          <button class="adv-tab" data-scheme="bip84" onclick="setAdvScheme('bip84', this)">BIP84</button>
+        </div>
+
+        <div class="adv-controls">
+          <div class="adv-field">
+            <label>Derivation Path</label>
+            <div id="advPath" class="adv-path">m/0'/0/0</div>
+          </div>
+          <div class="adv-field">
+            <label>Account</label>
+            <input id="advAccount" type="number" min="0" value="0" />
+          </div>
+          <div class="adv-field">
+            <label>Chain (0/1)</label>
+            <input id="advChain" type="number" min="0" max="1" value="0" />
+          </div>
+          <div class="adv-field">
+            <label>Index</label>
+            <input id="advIndex" type="number" min="0" value="0" />
+          </div>
+          <button class="btn-inline" id="advApplyBtn" onclick="applyAdvancedDerivation()">Apply</button>
+        </div>
+
+        <div id="advResult" class="adv-key-grid"></div>
+      </div>
     </div>
   </div>
 
@@ -678,6 +858,20 @@
   Ne partagez jamais votre seed phrase &nbsp;·&nbsp; Sauvegardez hors ligne (papier / métal)
 </footer>
 
+<div id="qrModal" class="qr-modal" onclick="if(event.target.id==='qrModal'){closeQrModal()}" aria-hidden="true">
+  <div class="qr-card">
+    <div id="qrTitle" class="qr-title">QR Code</div>
+    <div class="qr-image-wrap">
+      <img id="qrImg" alt="QR" />
+    </div>
+    <div id="qrText" class="qr-text"></div>
+    <div class="qr-actions">
+      <button class="btn-inline" onclick="copyRaw(document.getElementById('qrText').textContent)">Copier</button>
+      <button class="btn-inline" onclick="closeQrModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── JavaScript ──────────────────────────────────────────────────────────── -->
 <script>
   /* ─ State ─────────────────────────────────────────────── */
@@ -685,7 +879,7 @@
   let selectedWC = 12;
   let hidden = false;
   let lastPhrase = '';
-  let btcHidden = true;
+  let advScheme = 'bip32';
 
   /* ─ Tab switching ─────────────────────────────────────── */
   function switchTab(name, btn) {
@@ -863,7 +1057,6 @@
     const passphrase = document.getElementById('btcPassphrase').value;
     const btn = document.getElementById('btcBtn');
     const res = document.getElementById('btcResult');
-    btcHidden = true;
 
     if (!phrase) {
       res.innerHTML = `<div class="verify-result bad">❌ Veuillez saisir une phrase.</div>`;
@@ -892,20 +1085,12 @@
           <div class="result-header">
             <span class="section-label" style="margin:0">Résultats dérivation Bitcoin</span>
             <div class="result-actions">
-              <button class="btn-sm" id="btcHideBtn" onclick="toggleBtcHide()">👁 Afficher</button>
               <button class="btn-sm" id="btcCopyAddrBtn" onclick="copyText('${escJs(d.bip84.address)}', 'btcCopyAddrBtn')">📋 Copier BTC (bech32)</button>
             </div>
           </div>
 
-          <div class="kv-block">
-            <div class="kv-label">Seed (hex)</div>
-            <div class="kv-value hidden" data-btc-sensitive>${esc(d.seed_hex)}</div>
-          </div>
-
-          <div class="kv-block">
-            <div class="kv-label">BIP32 Root Key (xprv)</div>
-            <div class="kv-value hidden" data-btc-sensitive>${esc(d.bip32_root_key)}</div>
-          </div>
+          ${renderKvField('Seed (hex)', d.seed_hex)}
+          ${renderKvField('BIP32 Root Key (xprv)', d.bip32_root_key)}
 
           <div class="btc-grid">
             ${renderBtcCard('BIP44 (Legacy)', d.bip44)}
@@ -919,6 +1104,8 @@
         </div>`;
 
       res.style.display = 'block';
+      document.getElementById('btcAdvanced').style.display = 'block';
+      await applyAdvancedDerivation();
     } catch (e) {
       res.innerHTML = errBox('Erreur réseau : ' + e.message);
       res.style.display = 'block';
@@ -934,23 +1121,48 @@
         <div class="btc-mini">Path</div>
         <div class="btc-val">${esc(d.path)}</div>
         <div class="btc-mini">Address</div>
-        <div class="btc-val">${esc(d.address)}</div>
+        <div class="btc-val">${esc(d.address)}
+          <span class="mini-actions" style="margin-top:.28rem">
+            <button class="mini-btn" onclick="copyRaw('${escJs(d.address)}')">📋</button>
+            <button class="mini-btn" onclick="showQrModal('${escJs(d.address)}', 'Bitcoin Address')">🔳 QR</button>
+          </span>
+        </div>
         <div class="btc-mini">Account XPUB</div>
-        <div class="btc-val">${esc(d.account_xpub)}</div>
+        <div class="btc-val">${esc(d.account_xpub)}
+          <span class="mini-actions" style="margin-top:.28rem">
+            <button class="mini-btn" onclick="copyRaw('${escJs(d.account_xpub)}')">📋</button>
+            <button class="mini-btn" onclick="showQrModal('${escJs(d.account_xpub)}', 'Account XPUB')">🔳 QR</button>
+          </span>
+        </div>
         <div class="btc-mini">Account XPRV</div>
-        <div class="btc-val hidden" data-btc-sensitive>${esc(d.account_xprv)}</div>
+        <div class="btc-val">${esc(d.account_xprv)}
+          <span class="mini-actions" style="margin-top:.28rem">
+            <button class="mini-btn" onclick="copyRaw('${escJs(d.account_xprv)}')">📋</button>
+            <button class="mini-btn" onclick="showQrModal('${escJs(d.account_xprv)}', 'Account XPRV')">🔳 QR</button>
+          </span>
+        </div>
         <div class="btc-mini">WIF (index 0)</div>
-        <div class="btc-val hidden" data-btc-sensitive>${esc(d.wif)}</div>
+        <div class="btc-val">${esc(d.wif)}
+          <span class="mini-actions" style="margin-top:.28rem">
+            <button class="mini-btn" onclick="copyRaw('${escJs(d.wif)}')">📋</button>
+            <button class="mini-btn" onclick="showQrModal('${escJs(d.wif)}', 'WIF')">🔳 QR</button>
+          </span>
+        </div>
       </div>`;
   }
 
-  function toggleBtcHide() {
-    btcHidden = !btcHidden;
-    document.querySelectorAll('[data-btc-sensitive]').forEach(el => {
-      el.classList.toggle('hidden', btcHidden);
-    });
-    const btn = document.getElementById('btcHideBtn');
-    if (btn) btn.textContent = btcHidden ? '👁 Afficher' : '👁 Masquer';
+  function renderKvField(label, value) {
+    return `
+      <div class="kv-block">
+        <div class="kv-head">
+          <div class="kv-label">${esc(label)}</div>
+          <div class="mini-actions">
+            <button class="mini-btn" onclick="copyRaw('${escJs(value)}')">📋</button>
+            <button class="mini-btn" onclick="showQrModal('${escJs(value)}', '${escJs(label)}')">🔳 QR</button>
+          </div>
+        </div>
+        <div class="kv-value">${esc(value)}</div>
+      </div>`;
   }
 
   function copyText(text, btnId) {
@@ -965,6 +1177,120 @@
         btn.classList.remove('ok');
       }, 1800);
     });
+  }
+
+  function copyRaw(text) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  function setAdvScheme(scheme, btn) {
+    advScheme = scheme;
+    document.querySelectorAll('.adv-tab').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    updatePathPreview();
+    applyAdvancedDerivation();
+  }
+
+  function updatePathPreview() {
+    const account = parseInt(document.getElementById('advAccount').value || '0', 10);
+    const chain = parseInt(document.getElementById('advChain').value || '0', 10);
+    const index = parseInt(document.getElementById('advIndex').value || '0', 10);
+    const safeAccount = Number.isFinite(account) && account >= 0 ? account : 0;
+    const safeChain = Number.isFinite(chain) && chain >= 0 ? chain : 0;
+    const safeIndex = Number.isFinite(index) && index >= 0 ? index : 0;
+    const prefix = advScheme === 'bip32'
+      ? `m/${safeAccount}'/${safeChain}`
+      : advScheme === 'bip44'
+        ? `m/44'/0'/${safeAccount}'/${safeChain}`
+        : advScheme === 'bip49'
+          ? `m/49'/0'/${safeAccount}'/${safeChain}`
+          : `m/84'/0'/${safeAccount}'/${safeChain}`;
+    document.getElementById('advPath').textContent = `${prefix}/${safeIndex}`;
+  }
+
+  async function applyAdvancedDerivation() {
+    const phrase = document.getElementById('btcPhraseInput').value.trim();
+    const passphrase = document.getElementById('btcPassphrase').value;
+    const account = parseInt(document.getElementById('advAccount').value || '0', 10);
+    const chain = parseInt(document.getElementById('advChain').value || '0', 10);
+    const index = parseInt(document.getElementById('advIndex').value || '0', 10);
+    const btn = document.getElementById('advApplyBtn');
+    const out = document.getElementById('advResult');
+
+    updatePathPreview();
+
+    if (!phrase) {
+      out.innerHTML = `<div class="verify-result bad">❌ Saisissez d'abord une phrase BIP39.</div>`;
+      return;
+    }
+
+    setBusy(btn, '<span class="spin"></span> Apply');
+    try {
+      const r = await fetch('/api/bitcoin/derive-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phrase,
+          passphrase,
+          scheme: advScheme,
+          account: Number.isFinite(account) && account >= 0 ? account : 0,
+          chain: Number.isFinite(chain) && chain >= 0 ? chain : 0,
+          index: Number.isFinite(index) && index >= 0 ? index : 0,
+        })
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) {
+        out.innerHTML = `<div class="verify-result bad">❌ ${esc(d.error || 'Erreur')}</div>`;
+        return;
+      }
+
+      out.innerHTML = `
+        ${renderKvField('Account Private Key', d.account_xprv || '-')}
+        ${renderKvField('Account Public Key', d.account_xpub || '-')}
+        ${renderKvField('Full Path', d.full_path || '-')}
+        ${d.address ? renderKvField('Address', d.address) : ''}
+        ${d.wif ? renderKvField('WIF', d.wif) : ''}
+        ${d.child_private_key_hex ? renderKvField('Child Private Key (hex)', d.child_private_key_hex) : ''}
+        ${d.child_public_key_hex ? renderKvField('Child Public Key (hex)', d.child_public_key_hex) : ''}
+      `;
+    } catch (e) {
+      out.innerHTML = `<div class="verify-result bad">❌ Erreur réseau : ${esc(e.message)}</div>`;
+    } finally {
+      setIdle(btn, 'Apply');
+    }
+  }
+
+  async function showQrModal(text, title) {
+    const modal = document.getElementById('qrModal');
+    const img = document.getElementById('qrImg');
+    const txt = document.getElementById('qrText');
+    const ttl = document.getElementById('qrTitle');
+
+    ttl.textContent = title || 'QR Code';
+    txt.textContent = text;
+    img.removeAttribute('src');
+    modal.classList.add('show');
+
+    try {
+      const r = await fetch('/api/qrcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) {
+        img.setAttribute('alt', 'QR indisponible');
+        return;
+      }
+      img.setAttribute('src', `data:image/png;base64,${d.png_base64}`);
+      img.setAttribute('alt', `QR ${title || ''}`);
+    } catch (_) {
+      img.setAttribute('alt', 'QR indisponible');
+    }
+  }
+
+  function closeQrModal() {
+    document.getElementById('qrModal').classList.remove('show');
   }
 
   /* ─ Hide / show words ─────────────────────────────────── */

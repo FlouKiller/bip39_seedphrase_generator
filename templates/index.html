@@ -596,6 +596,88 @@
       grid-template-columns: 1fr;
       gap: .6rem;
     }
+    .dep-box {
+      margin-top: .85rem;
+      border: 1px solid var(--border);
+      border-radius: var(--rs);
+      background: var(--bg2);
+      overflow: hidden;
+    }
+    .dep-head {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .7rem;
+      border: none;
+      background: transparent;
+      color: var(--txt);
+      padding: .85rem .95rem;
+      cursor: pointer;
+      text-align: left;
+    }
+    .dep-head:hover { background: rgba(37,99,235,.06); }
+    .dep-title-wrap { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
+    .dep-title { font-size: .92rem; font-weight: 700; }
+    .dep-badge {
+      font-size: .7rem;
+      color: var(--accent-l);
+      border: 1px solid rgba(96,165,250,.3);
+      background: rgba(37,99,235,.12);
+      border-radius: 999px;
+      padding: .15rem .42rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .dep-meta { color: var(--txt3); font-size: .75rem; }
+    .dep-arrow {
+      font-size: 1rem;
+      color: var(--txt2);
+      transition: transform var(--t);
+    }
+    .dep-box.open .dep-arrow { transform: rotate(180deg); }
+    .dep-body { display: none; padding: 0 .95rem .95rem; }
+    .dep-box.open .dep-body { display: block; }
+    .dep-controls {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: .65rem;
+    }
+    .dep-table {
+      display: grid;
+      gap: .55rem;
+    }
+    .dep-row {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1.2fr) minmax(0, 1.5fr);
+      gap: .7rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(16,30,48,.75);
+      padding: .7rem;
+    }
+    .dep-col-label {
+      font-size: .66rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--txt3);
+      margin-bottom: .2rem;
+    }
+    .dep-code {
+      font-family: var(--mono);
+      font-size: .8rem;
+      color: var(--txt2);
+      word-break: break-all;
+      line-height: 1.55;
+    }
+    .dep-key-line { margin-bottom: .35rem; }
+    .dep-key-line:last-child { margin-bottom: 0; }
+    .dep-inline-actions {
+      display: inline-flex;
+      gap: .25rem;
+      margin-left: .35rem;
+      vertical-align: middle;
+    }
 
     /* ── Entropy ────────────────────────────────────────────────────────────── */
     .ent-info {
@@ -666,6 +748,7 @@
       .btc-grid { grid-template-columns: 1fr; }
       .in-row { flex-direction: column; align-items: stretch; }
       .adv-controls { grid-template-columns: 1fr; }
+      .dep-row { grid-template-columns: 1fr; }
       .tab-btn .tab-text { display: none; }
       .wc-toggle { flex-direction: column; }
     }
@@ -820,10 +903,31 @@
             <label>Index</label>
             <input id="advIndex" type="number" min="0" value="0" />
           </div>
+          <div class="adv-field">
+            <label>Count</label>
+            <input id="depCount" type="number" min="1" max="50" value="10" />
+          </div>
           <button class="btn-inline" id="advApplyBtn" onclick="applyAdvancedDerivation()">Apply</button>
         </div>
 
         <div id="advResult" class="adv-key-grid"></div>
+
+        <div id="depositBox" class="dep-box" style="display:none;">
+          <button class="dep-head" onclick="toggleDepositBox()">
+            <span class="dep-title-wrap">
+              <span class="dep-title">Adresses de dépôt</span>
+              <span id="depSchemeBadge" class="dep-badge">BIP84</span>
+              <span id="depMeta" class="dep-meta">0 -> 9</span>
+            </span>
+            <span class="dep-arrow">⌄</span>
+          </button>
+          <div class="dep-body">
+            <div class="dep-controls">
+              <button class="btn-inline" id="depReloadBtn" onclick="loadDepositAddresses(true)">Recharger</button>
+            </div>
+            <div id="depositResult" class="dep-table"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -880,6 +984,7 @@
   let hidden = false;
   let lastPhrase = '';
   let advScheme = 'bip32';
+  let depositLoadedKey = '';
 
   /* ─ Tab switching ─────────────────────────────────────── */
   function switchTab(name, btn) {
@@ -1105,6 +1210,10 @@
 
       res.style.display = 'block';
       document.getElementById('btcAdvanced').style.display = 'block';
+      document.getElementById('depositBox').style.display = 'block';
+      document.getElementById('depositBox').classList.remove('open');
+      document.getElementById('depositResult').innerHTML = '';
+      depositLoadedKey = '';
       await applyAdvancedDerivation();
     } catch (e) {
       res.innerHTML = errBox('Erreur réseau : ' + e.message);
@@ -1214,6 +1323,7 @@
     const account = parseInt(document.getElementById('advAccount').value || '0', 10);
     const chain = parseInt(document.getElementById('advChain').value || '0', 10);
     const index = parseInt(document.getElementById('advIndex').value || '0', 10);
+    const depCount = parseInt(document.getElementById('depCount').value || '10', 10);
     const btn = document.getElementById('advApplyBtn');
     const out = document.getElementById('advResult');
 
@@ -1253,11 +1363,120 @@
         ${d.child_private_key_hex ? renderKvField('Child Private Key (hex)', d.child_private_key_hex) : ''}
         ${d.child_public_key_hex ? renderKvField('Child Public Key (hex)', d.child_public_key_hex) : ''}
       `;
+
+      document.getElementById('depSchemeBadge').textContent = advScheme.toUpperCase();
+      document.getElementById('depMeta').textContent = `${Number.isFinite(index) && index >= 0 ? index : 0} -> ${(Number.isFinite(index) && index >= 0 ? index : 0) + Math.max(1, Math.min(50, Number.isFinite(depCount) ? depCount : 10)) - 1}`;
+
+      if (document.getElementById('depositBox').classList.contains('open')) {
+        await loadDepositAddresses(true);
+      }
     } catch (e) {
       out.innerHTML = `<div class="verify-result bad">❌ Erreur réseau : ${esc(e.message)}</div>`;
     } finally {
       setIdle(btn, 'Apply');
     }
+  }
+
+  function toggleDepositBox() {
+    const box = document.getElementById('depositBox');
+    box.classList.toggle('open');
+    if (box.classList.contains('open')) {
+      loadDepositAddresses(false);
+    }
+  }
+
+  async function loadDepositAddresses(forceReload) {
+    const phrase = document.getElementById('btcPhraseInput').value.trim();
+    const passphrase = document.getElementById('btcPassphrase').value;
+    const account = parseInt(document.getElementById('advAccount').value || '0', 10);
+    const chain = parseInt(document.getElementById('advChain').value || '0', 10);
+    const startIndex = parseInt(document.getElementById('advIndex').value || '0', 10);
+    const count = parseInt(document.getElementById('depCount').value || '10', 10);
+    const result = document.getElementById('depositResult');
+    const reloadBtn = document.getElementById('depReloadBtn');
+    const requestKey = [advScheme, account, chain, startIndex, count, phrase, passphrase].join('|');
+
+    if (!forceReload && depositLoadedKey === requestKey && result.innerHTML.trim()) {
+      return;
+    }
+
+    if (advScheme === 'bip32') {
+      result.innerHTML = `<div class="verify-result bad">❌ La liste d'adresses de dépôt est disponible pour BIP44, BIP49 et BIP84 uniquement.</div>`;
+      depositLoadedKey = requestKey;
+      return;
+    }
+
+    if (!phrase) {
+      result.innerHTML = `<div class="verify-result bad">❌ Saisissez d'abord une phrase BIP39.</div>`;
+      return;
+    }
+
+    setBusy(reloadBtn, '<span class="spin"></span>');
+    result.innerHTML = '<div class="verify-result" style="margin-top:0">Chargement des adresses…</div>';
+
+    try {
+      const r = await fetch('/api/bitcoin/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phrase,
+          passphrase,
+          scheme: advScheme,
+          account: Number.isFinite(account) && account >= 0 ? account : 0,
+          chain: Number.isFinite(chain) && chain >= 0 ? chain : 0,
+          start_index: Number.isFinite(startIndex) && startIndex >= 0 ? startIndex : 0,
+          count: Number.isFinite(count) && count >= 1 ? Math.min(count, 50) : 10,
+        })
+      });
+      const d = await r.json();
+      if (!r.ok || d.error) {
+        result.innerHTML = `<div class="verify-result bad">❌ ${esc(d.error || 'Erreur')}</div>`;
+        return;
+      }
+
+      depositLoadedKey = requestKey;
+      document.getElementById('depMeta').textContent = `${d.start_index} -> ${d.start_index + d.count - 1}`;
+      result.innerHTML = d.items.map(item => renderDepositRow(item)).join('');
+    } catch (e) {
+      result.innerHTML = `<div class="verify-result bad">❌ Erreur réseau : ${esc(e.message)}</div>`;
+    } finally {
+      setIdle(reloadBtn, 'Recharger');
+    }
+  }
+
+  function renderDepositRow(item) {
+    return `
+      <div class="dep-row">
+        <div>
+          <div class="dep-col-label">Path</div>
+          <div class="dep-code">${esc(item.path)}</div>
+        </div>
+        <div>
+          <div class="dep-col-label">Address</div>
+          <div class="dep-code">
+            ${esc(item.address)}
+            <span class="dep-inline-actions">
+              <button class="mini-btn" onclick="copyRaw('${escJs(item.address)}')">📋</button>
+              <button class="mini-btn" onclick="showQrModal('${escJs(item.address)}', 'Deposit Address')">🔳</button>
+            </span>
+          </div>
+        </div>
+        <div>
+          <div class="dep-col-label">Keys</div>
+          <div class="dep-key-line dep-code">Public: ${esc(item.public_key_hex)}
+            <span class="dep-inline-actions">
+              <button class="mini-btn" onclick="copyRaw('${escJs(item.public_key_hex)}')">📋</button>
+              <button class="mini-btn" onclick="showQrModal('${escJs(item.public_key_hex)}', 'Public Key')">🔳</button>
+            </span>
+          </div>
+          <div class="dep-key-line dep-code">Private: ${esc(item.private_key_wif)}
+            <span class="dep-inline-actions">
+              <button class="mini-btn" onclick="copyRaw('${escJs(item.private_key_wif)}')">📋</button>
+              <button class="mini-btn" onclick="showQrModal('${escJs(item.private_key_wif)}', 'Private Key WIF')">🔳</button>
+            </span>
+          </div>
+        </div>
+      </div>`;
   }
 
   async function showQrModal(text, title) {

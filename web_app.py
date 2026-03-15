@@ -302,6 +302,78 @@ def api_bitcoin_derive_path():
         return jsonify({"error": f"Échec de dérivation avancée : {str(e)}"}), 500
 
 
+@app.route("/api/bitcoin/addresses", methods=["POST"])
+def api_bitcoin_addresses():
+    data = request.get_json(silent=True) or {}
+    mnemonic, err = parse_and_validate_mnemonic(data.get("phrase", ""))
+    if err:
+        return jsonify({"error": err}), 400
+
+    passphrase = data.get("passphrase", "")
+    if not isinstance(passphrase, str):
+        return jsonify({"error": "La passphrase doit être une chaîne."}), 400
+
+    scheme = str(data.get("scheme", "bip84")).lower()
+    if scheme not in ["bip44", "bip49", "bip84"]:
+        return jsonify({"error": "Les adresses de dépôt sont disponibles pour bip44, bip49 et bip84 uniquement."}), 400
+
+    account, err = parse_non_negative_int(data.get("account", 0), "account")
+    if err:
+        return jsonify({"error": err}), 400
+    chain, err = parse_non_negative_int(data.get("chain", 0), "chain")
+    if err:
+        return jsonify({"error": err}), 400
+    start_index, err = parse_non_negative_int(data.get("start_index", 0), "start_index")
+    if err:
+        return jsonify({"error": err}), 400
+    count, err = parse_non_negative_int(data.get("count", 10), "count")
+    if err:
+        return jsonify({"error": err}), 400
+
+    if chain not in [0, 1]:
+        return jsonify({"error": "chain doit être 0 (external) ou 1 (internal)."}), 400
+    if count < 1 or count > 50:
+        return jsonify({"error": "count doit être compris entre 1 et 50."}), 400
+
+    try:
+        seed_bytes = Bip39SeedGenerator(mnemonic).Generate(passphrase)
+        change = Bip44Changes.CHAIN_EXT if chain == 0 else Bip44Changes.CHAIN_INT
+
+        if scheme == "bip44":
+            acc = Bip44.FromSeed(seed_bytes, Bip44Coins.BITCOIN).Purpose().Coin().Account(account)
+            purpose = 44
+        elif scheme == "bip49":
+            acc = Bip49.FromSeed(seed_bytes, Bip49Coins.BITCOIN).Purpose().Coin().Account(account)
+            purpose = 49
+        else:
+            acc = Bip84.FromSeed(seed_bytes, Bip84Coins.BITCOIN).Purpose().Coin().Account(account)
+            purpose = 84
+
+        chain_ctx = acc.Change(change)
+        items = []
+        for offset in range(count):
+            index = start_index + offset
+            addr_ctx = chain_ctx.AddressIndex(index)
+            items.append({
+                "path": f"m/{purpose}'/0'/{account}'/{chain}/{index}",
+                "index": index,
+                "address": addr_ctx.PublicKey().ToAddress(),
+                "public_key_hex": addr_ctx.PublicKey().RawCompressed().ToHex(),
+                "private_key_wif": addr_ctx.PrivateKey().ToWif(),
+            })
+
+        return jsonify({
+            "scheme": scheme,
+            "account": account,
+            "chain": chain,
+            "start_index": start_index,
+            "count": count,
+            "items": items,
+        })
+    except Exception as e:
+        return jsonify({"error": f"Échec dérivation des adresses : {str(e)}"}), 500
+
+
 @app.route("/api/entropy", methods=["GET"])
 def api_entropy():
     sample_size = 1024 * 1024

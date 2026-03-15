@@ -1,9 +1,9 @@
 # BIP39 Seed Phrase Generator
 
-Outil local en Python avec deux modes:
+Outil local avec deux modes:
 
 - une version CLI simple pour generer/verifier une phrase BIP39,
-- une version web Flask avec interface moderne et outils Bitcoin derives.
+- une version web a logique 100% client-side (HTML/CSS/JavaScript) avec outils Bitcoin derives.
 
 ## Fonctionnalites
 
@@ -13,12 +13,12 @@ Outil local en Python avec deux modes:
 - verification de phrase BIP39 (mots + checksum),
 - diagnostic simple de l'entropie systeme.
 
-### Web Flask
+### Web (client-side)
 
 - generation BIP39 avec interface graphique,
 - verification de phrase BIP39,
 - diagnostic d'entropie,
-- derivation Bitcoin a partir d'une phrase + passphrase optionnelle,
+- derivation Bitcoin locale a partir d'une phrase + passphrase optionnelle,
 - affichage de:
   - seed hex,
   - BIP32 root key,
@@ -30,7 +30,7 @@ Outil local en Python avec deux modes:
   - chaine (`chain`: externe/interne),
   - index,
 - section repliable d'adresses de depot,
-- QR code local pour adresses, cles et champs derives,
+- QR code genere localement dans le navigateur,
 - copie rapide des valeurs sensibles.
 
 ## Validation de la wordlist
@@ -74,7 +74,7 @@ py -m pip install -r requirements.txt
 python app.py
 ```
 
-### Mode Web Flask
+### Mode Web
 
 ```bash
 python web_app.py
@@ -85,6 +85,10 @@ Puis ouvrir:
 ```text
 http://127.0.0.1:5000
 ```
+
+Note: le backend Flask sert uniquement la page HTML. Les operations de generation,
+verification, derivation Bitcoin, QR et test d'entropie sont executees dans le navigateur,
+sans envoi des secrets a une API serveur du projet.
 
 ## Utilisation de la version web
 
@@ -120,29 +124,13 @@ Le mode avance permet aussi de:
 
 ### 4. Entropie
 
-- lance un test simple sur 1 Mo de donnees `os.urandom`,
+- lance un test simple sur 1 Mo de donnees aleatoires via `window.crypto.getRandomValues`,
 - affiche entropie estimee, chi-square et couverture des octets.
-
-## Endpoints Flask utiles
-
-- `POST /api/generate`
-- `POST /api/verify`
-- `GET /api/entropy`
-- `POST /api/bitcoin/derive`
-- `POST /api/bitcoin/derive-path`
-- `POST /api/bitcoin/addresses`
-- `POST /api/qrcode`
-
-Exemple `curl` pour tester la generation:
-
-```bash
-curl -s -X POST http://127.0.0.1:5000/api/generate -H "Content-Type: application/json" -d "{\"word_count\": 12}"
-```
 
 ## Structure du projet
 
 - `app.py` : version CLI
-- `web_app.py` : backend Flask + APIs
+- `web_app.py` : serveur Flask minimal pour servir l'interface
 - `templates/index.html` : interface web
 - `bip39_words.txt` : wordlist BIP39 anglaise
 - `requirements.txt` : dependances Python
@@ -150,8 +138,6 @@ curl -s -X POST http://127.0.0.1:5000/api/generate -H "Content-Type: application
 ## Dependances
 
 - `flask`
-- `bip-utils`
-- `qrcode[pil]`
 
 ## Securite
 
